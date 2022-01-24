@@ -13,11 +13,15 @@ const vonage = new Vonage({
 
 app.use(morgan('tiny'));
 app.use(express.json());
-
+let talkAction = {
+                  "action": "talk",
+                  "text": "welcome to ivr system, press 1 for telugu, press 2 for english, press 3 for kannada, press 4 for hindi, press 8 to repeat, press 9 to exit",
+                  "bargeIn": true
+                }
 let inputAction = {
                     "action": "input",
                     "eventUrl": [
-                      "https://2c2f-182-74-35-130.ngrok.io/ivr"
+                      "https://d110-182-74-35-130.ngrok.io/ivr"
                     ],
                     "type": ["dtmf"],   
                     "dtmf": {
@@ -37,11 +41,7 @@ app.get('/call', (req, res) => {
       number: process.env.VONAGE_NUMBER,
     },
     ncco: [
-      {
-        "action": "talk",
-        "text": "welcome to ivr system, press 1 for telugu, press 2 for english, press 3 for kannada, press 4 for hindi, press 8 to repeat, press 9 to exit",
-        "bargeIn": true
-      },
+      talkAction,
       inputAction
     ]
   }, (err, resp) => {
@@ -62,45 +62,39 @@ app.post('/ivr',(req,res) => {
   let responseObject = req.body;
   let isTimedOut = responseObject.dtmf.timed_out
   if(isTimedOut){
+    let timedoutTalkAction = { ...talkAction };
+    timedoutTalkAction["text"] = "you didn't enter any digit, please enter any digit or to repeat press 8"
     res.json([
-      {
-        "action": "talk",
-        "text":"you didn't enter any digit, please enter any digit, to repeat press 8",
-        "bargeIn": true
-      },
+      timedoutTalkAction,
       inputAction
     ])
   }
   else{
     let entered_digit = responseObject.dtmf.digits;
-    let response = {
+    let responseTalkAction = {
       "action":"talk",
       "text":"you have choosen "
     }
     switch (entered_digit){
       case "1":
-        response["text"] += "telugu";
-        res.json([response]);
+        responseTalkAction["text"] += "telugu";
+        res.json([responseTalkAction]);
         break;
       case "2":
-        response["text"] += "english";
-        res.json([response]);
+        responseTalkAction["text"] += "english";
+        res.json([responseTalkAction]);
         break;
       case "3":
-        response["text"] += "kannada";
-        res.json([response]);
+        responseTalkAction["text"] += "kannada";
+        res.json([responseTalkAction]);
         break;
       case "4":
-        response["text"] += "hindi";
-        res.json([response]);
+        responseTalkAction["text"] += "hindi";
+        res.json([responseTalkAction]);
         break;
       case "8":
         res.json([
-          {
-            "action": "talk",
-            "text": "welcome to ivr system, press 1 for telugu, press 2 for english, press 3 for kannada, press 4 for hindi, press 8 to repeat, press 9 to exit",
-            "bargeIn": true
-          },
+          talkAction,
           inputAction
         ]);
         break;
@@ -108,11 +102,8 @@ app.post('/ivr',(req,res) => {
         res.json([]);
         break;
       default:
+        // https://github.com/manikanta-MB/IVR-Audio-Recordings/blob/main/stream/sample%20record%201.mp3?raw=true
         res.json([
-          {
-            "action":"talk",
-            "text":"you have choosen wrong option, please choose a valid option"
-          },
           {
             "action": "stream",
             "streamUrl": ["https://github.com/manikanta-MB/IVR-Audio-Recordings/blob/main/stream/sample%20record%201.mp3?raw=true"]
