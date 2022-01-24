@@ -13,22 +13,34 @@ const vonage = new Vonage({
 
 app.use(morgan('tiny'));
 app.use(express.json());
-let talkAction = {
-                  "action": "talk",
-                  "text": "welcome to ivr system, press 1 for telugu, press 2 for english, press 3 for kannada, press 4 for hindi, press 8 to repeat, press 9 to exit",
-                  "bargeIn": true
-                }
-let inputAction = {
-                    "action": "input",
-                    "eventUrl": [
-                      "https://d110-182-74-35-130.ngrok.io/ivr"
-                    ],
-                    "type": ["dtmf"],   
-                    "dtmf": {
-                      "maxDigits": 1
-                    }  
-                  }
 
+function getStreamAction(url){
+  let streamAction = {
+    "action": "stream",
+    "streamUrl": [url],
+    "bargeIn": true
+  }
+  return streamAction
+}
+
+function getInputAction(eventEndpoint){
+  let inputAction = {
+    "action": "input",
+    "eventUrl": [
+      "https://e882-36-255-87-146.ngrok.io/"+eventEndpoint
+    ],
+    "type": ["dtmf"],   
+    "dtmf": {
+      "maxDigits": 1
+    }  
+  }
+  return inputAction
+}
+
+let baseUrl = "https://github.com/manikanta-MB/IVR-Audio-Recordings/blob/main/"
+let baseInputAction = getInputAction("base_input")
+let innerInputAction = getInputAction("inner_input")
+let chosenLanguage = ""
 
 app.get('/call', (req, res) => {
   vonage.calls.create({
@@ -41,8 +53,9 @@ app.get('/call', (req, res) => {
       number: process.env.VONAGE_NUMBER,
     },
     ncco: [
-      talkAction,
-      inputAction
+      getStreamAction(baseUrl + "baseinput/input%201.mp3?raw=true"),
+      getStreamAction(baseUrl + "baseinput/input%202.mp3?raw=true"),
+      baseInputAction
     ]
   }, (err, resp) => {
     if (err)
@@ -50,7 +63,7 @@ app.get('/call', (req, res) => {
     if (resp)
       console.log(resp);
   });
-  res.json('ok');
+  res.send('<h1>Call was made</h1>');
 });
 
 app.post('/event', (req, res) => {
@@ -58,56 +71,126 @@ app.post('/event', (req, res) => {
   res.status(200).send('');
 });
 
-app.post('/ivr',(req,res) => {
+// Level 1
+
+app.post('/base_input',(req,res) => {
   let responseObject = req.body;
   let isTimedOut = responseObject.dtmf.timed_out
   if(isTimedOut){
-    let timedoutTalkAction = { ...talkAction };
-    timedoutTalkAction["text"] = "you didn't enter any digit, please enter any digit or to repeat press 8"
     res.json([
-      timedoutTalkAction,
-      inputAction
+      getStreamAction(baseUrl + "baseinput/input%203.mp3?raw=true"),
+      getStreamAction(baseUrl + "baseinput/input%202.mp3?raw=true"),
+      baseInputAction
     ])
   }
   else{
     let entered_digit = responseObject.dtmf.digits;
-    let responseTalkAction = {
-      "action":"talk",
-      "text":"you have choosen "
-    }
     switch (entered_digit){
       case "1":
-        responseTalkAction["text"] += "telugu";
-        res.json([responseTalkAction]);
+        chosenLanguage = "telugu"
+        res.json([
+          getStreamAction(baseUrl + "telugu/input%201.mp3?raw=true"),
+          getStreamAction(baseUrl + "telugu/input%202.mp3?raw=true"),
+          innerInputAction
+        ]);
         break;
       case "2":
-        responseTalkAction["text"] += "english";
-        res.json([responseTalkAction]);
+        chosenLanguage = "english"
+        res.json([
+          getStreamAction(baseUrl + "english/input%201.mp3?raw=true"),
+          getStreamAction(baseUrl + "english/input%202.mp3?raw=true"),
+          innerInputAction
+        ]);
         break;
       case "3":
-        responseTalkAction["text"] += "kannada";
-        res.json([responseTalkAction]);
+        chosenLanguage = "kannada"
+        res.json([
+          getStreamAction(baseUrl + "kannada/input%201.mp3?raw=true"),
+          getStreamAction(baseUrl + "kannada/input%202.mp3?raw=true"),
+          innerInputAction
+        ]);
         break;
       case "4":
-        responseTalkAction["text"] += "hindi";
-        res.json([responseTalkAction]);
+        chosenLanguage = "hindi"
+        res.json([
+          getStreamAction(baseUrl + "hindi/input%201.mp3?raw=true"),
+          getStreamAction(baseUrl + "hindi/input%202.mp3?raw=true"),
+          innerInputAction
+        ]);
         break;
       case "8":
         res.json([
-          talkAction,
-          inputAction
+          getStreamAction(baseUrl + "baseinput/input%202.mp3?raw=true"),
+          baseInputAction
         ]);
         break;
       case "9":
         res.json([]);
         break;
       default:
-        // https://github.com/manikanta-MB/IVR-Audio-Recordings/blob/main/stream/sample%20record%201.mp3?raw=true
+        //baseUrl +  stream/sample%20record%201.mp3?raw=true
+        res.json([
+          getStreamAction(baseUrl + "baseinput/input%204.mp3?raw=true"),
+          getStreamAction(baseUrl + "baseinput/input%202.mp3?raw=true"),
+          baseInputAction
+        ]);
+        break;
+    }
+  }
+});
+
+// Level 2
+app.post('/inner_input',(req,res) => {
+  let responseObject = req.body;
+  let isTimedOut = responseObject.dtmf.timed_out
+  if(isTimedOut){
+    res.json([
+      getStreamAction(baseUrl + chosenLanguage + "/input%203.mp3?raw=true"),
+      getStreamAction(baseUrl + chosenLanguage + "/input%202.mp3?raw=true"),
+      innerInputAction
+    ])
+  }
+  else{
+    let entered_digit = responseObject.dtmf.digits;
+    // console.log("entered digit " + entered_digit);
+    switch (entered_digit){
+      case "1":
+        console.log("entered");
         res.json([
           {
             "action": "stream",
-            "streamUrl": ["https://github.com/manikanta-MB/IVR-Audio-Recordings/blob/main/stream/sample%20record%201.mp3?raw=true"]
+            "streamUrl": [baseUrl + "ringtones/Idea.mp3?raw=true"]
           }
+        ]);
+        break;
+      case "2":
+        res.json([
+          {
+            "action": "stream",
+            "streamUrl": [baseUrl + "ringtones/Airtel%20Mobile%20!%20Airtel.mp3?raw=true"]
+          }
+        ]);
+        break;
+      case "3":
+        res.json([
+          getStreamAction(baseUrl + chosenLanguage + "/input%202.mp3?raw=true"),
+          innerInputAction
+        ]);
+        break;
+      case "4":
+        res.json([
+          getStreamAction(baseUrl + "baseinput/input%202.mp3?raw=true"),
+          baseInputAction
+        ]);
+        break;
+      case "5":
+        res.json([]);
+        break;
+      default:
+        res.json([
+          getStreamAction(baseUrl + chosenLanguage + "/input%204.mp3?raw=true"),
+          getStreamAction(baseUrl + chosenLanguage + "/input%202.mp3?raw=true"),
+          innerInputAction
         ]);
         break;
     }
