@@ -58,11 +58,6 @@ app.post('/event', (req, res) => {
   res.status(200).send('');
 });
 
-// app.post('/play_audio', (req, res) => {
-//   console.log(req.body);
-//   res.sendFile("./stream/sample record 1.mp3");
-// });
-
 app.post('/ivr',(req,res) => {
   let responseObject = req.body;
   let isTimedOut = responseObject.dtmf.timed_out
@@ -110,12 +105,7 @@ app.post('/ivr',(req,res) => {
         ]);
         break;
       case "9":
-        res.json([
-          {
-            "action":"talk",
-            "text":""
-          }
-        ]);
+        res.json([]);
         break;
       default:
         res.json([
@@ -123,40 +113,14 @@ app.post('/ivr',(req,res) => {
             "action":"talk",
             "text":"you have choosen wrong option, please choose a valid option"
           },
-          inputAction
+          {
+            "action": "stream",
+            "streamUrl": ["https://github.com/manikanta-MB/IVR-Audio-Recordings/blob/main/stream/sample%20record%201.mp3?raw=true"]
+          }
         ]);
         break;
     }
-    // res.json([
-    //   {
-    //     "action":"talk",
-    //     "text":"you entered the digit"+entered_digit
-    //   },
-    //   {
-    //     "action": "stream",
-    //     "streamUrl": ["https://www.mediafire.com/file/g2tkfdnhsykysc5/voice_api_audio_streaming.mp3"]
-    //   }
-    // ])
   }
 });
-
-// app.post('/answer', (req, res) => {
-//   const number = req.body.from.split('').join(' ');
-//   const ncco = [
-//     {
-//       action: 'talk',
-//       text: 'Thank you for calling from ' + number,
-//       language: 'en-IN',
-//       style: '4'
-//     },
-//     {
-//       action: 'stream',
-//       streamUrl: [
-//         'https://www.albinoblacksheep.com/audio/mp3/RickRollMarioPaint.mp3'
-//       ]
-//     }
-//   ];
-//   res.json(ncco);
-// });
 
 app.listen(process.env.PORT, () => console.log(`Running on port ${process.env.PORT}`));
