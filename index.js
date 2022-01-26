@@ -25,7 +25,7 @@ function getStreamAction(url){
 }
 
 function getInputAction(eventEndpoint,speechInput = false){
-  let remoteUrl = "https://8162-36-255-87-146.ngrok.io/"
+  let remoteUrl = "https://b05b-36-255-87-146.ngrok.io/"
   if(speechInput){
     let inputAction = {
       "action":"input",
@@ -321,6 +321,8 @@ app.post("/enter_info",(req,res) => {
       {
         "action":"talk",
         "text":spokenData,
+        "language":"en-IN",
+        "style": 0
       },
       getStreamAction(baseUrl + chosenLanguage + "/confirm info/soc.mp3?raw=true"),
       cofirmInfoInputAction
@@ -346,6 +348,8 @@ app.post("/confirm_info",(req,res) => {
       {
         "action":"talk",
         "text":spokenData,
+        "language":"en-IN",
+        "style": 0
       },
       getStreamAction(baseUrl + chosenLanguage + "/confirm info/soc.mp3?raw=true"),
       cofirmInfoInputAction
@@ -394,6 +398,8 @@ app.post("/confirm_info",(req,res) => {
           {
             "action":"talk",
             "text":spokenData,
+            "language":"en-IN",
+            "style": 0
           },
           getStreamAction(baseUrl + chosenLanguage + "/confirm info/soc.mp3?raw=true"),
           cofirmInfoInputAction
