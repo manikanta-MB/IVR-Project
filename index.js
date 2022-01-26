@@ -2,6 +2,7 @@ require('dotenv').config();
 const Vonage = require('@vonage/server-sdk');
 const express = require('express');
 const morgan = require('morgan');
+const client = require("./database");
 
 const app = express();
 const vonage = new Vonage({
@@ -24,7 +25,7 @@ function getStreamAction(url){
 }
 
 function getInputAction(eventEndpoint,speechInput = false){
-  let remoteUrl = "https://3b72-36-255-87-146.ngrok.io/"
+  let remoteUrl = "https://8162-36-255-87-146.ngrok.io/"
   if(speechInput){
     let inputAction = {
       "action":"input",
@@ -55,6 +56,60 @@ function getInputAction(eventEndpoint,speechInput = false){
   }
 }
 
+function create_entry_if_not_exists(){
+  client.query(`select mobile_number from user_info where mobile_number = $1`,[to], (err,result) => {
+      if(err){
+          console.log(err);
+      }
+      else{
+          if(result.rowCount == 0){
+            client.query(`insert into user_info (mobile_number) values ($1)`,[to], (err,result) => {
+                if(err){
+                    console.log(err);
+                }
+                else{
+                    console.log("entry created");
+                }
+                client.end();
+            });
+          }
+          else{
+            console.log("entry already existed.");
+          }
+      }
+  });
+}
+
+function updateData(){
+  let col1 = "", col2 = "";
+  switch(chosenInfo){
+    case "yn":
+      col1 = "your_name_text"
+      col2 = "your_name_audio_url"
+      break;
+    case "fn":
+      col1 = "father_name_text"
+      col2 = "father_name_audio_url"
+      break;
+    case "mn":
+      col1 = "mother_name_text"
+      col2 = "mother_name_audio_url"
+      break;
+    case "ad":
+      col1 = "address_text"
+      col2 = "address_audio_url"
+      break;
+  }
+  client.query(`update user_info set ${col1} = $1, ${col2} = $2 where mobile_number = $3 RETURNING *`,[spokenData,recordingPath,to], (err,result) => {
+    if(err){
+      console.log(err);
+    }
+    else{
+      console.log(result.rows);
+    }
+  });
+}
+
 let baseUrl = "https://github.com/manikanta-MB/IVR-Audio-Recordings/blob/main/"
 let baseInputAction = getInputAction("base_input")
 let infoInputAction = getInputAction("info_input")
@@ -64,6 +119,9 @@ let resultInfoInputAction = getInputAction("result_info")
 let chosenLanguage = ""
 let chosenInfo = ""
 let spokenData = ""
+let recordingPath = ""
+let recordingUrl = ""
+let to = ""
 
 app.get('/call', (req, res) => {
   vonage.calls.create({
@@ -91,6 +149,15 @@ app.get('/call', (req, res) => {
 
 app.post('/event', (req, res) => {
   console.log(req.body);
+  let status = req.body.status;
+  if(status == 'answered'){
+    client.connect();
+    to = req.body.to;
+    create_entry_if_not_exists();
+  }
+  else if(status == 'completed'){
+    client.end();
+  }
   res.status(200).send('');
 });
 
@@ -243,14 +310,9 @@ app.post("/enter_info",(req,res) => {
   else{
     spokenData = requestObj.speech.results[0].text
     console.log(spokenData);
-    // let recordingUrl = requestObj.speech.recording_url;
-    // console.log(recordingUrl);
-    // vonage.files.save(recordingUrl, 'test.mp3', (err, res) => {
-    //   if(err) { console.error(err); }
-    //   else {
-    //       console.log(res);
-    //   }
-    // });
+    recordingUrl = requestObj.speech.recording_url;
+    console.log(recordingUrl);
+    recordingPath = "Voice Data/"+to+"_"+chosenInfo+".mp3"
     res.json([
       {
         "action":"stream",
@@ -293,6 +355,13 @@ app.post("/confirm_info",(req,res) => {
     let entered_digit = requestObject.dtmf.digits;
     switch(entered_digit){
       case "1":
+        vonage.files.save(recordingUrl, recordingPath, (err, res) => {
+          if(err) { console.error(err); }
+          else {
+              console.log(res + " saved to file system.");
+          }
+        });
+        updateData();
         res.json([
           {
             "action":"stream",
