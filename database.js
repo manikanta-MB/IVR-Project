@@ -16,13 +16,20 @@ client.on("end", () => {
     console.log("Database Disconnected.");
 });
 
+client.connect();
+
 module.exports = client;
 
 // client.connect();
-// var a = "your_name_text";
-// var b = 'suresh';
 
-// client.query(`update user_info set ${a} = $1 RETURNING *`,[b], (err,result) => {
+// const a = 'CON-b7e8a70b-7946-4458-be22-011fa5a7d7aa'
+// const b = '919959635362'
+// const c = '2022-01-27T09:02:42.459Z'
+// const d = '2022-01-27T09:02:42.459Z'
+
+// client.query(`select * from conversation where uuid = $1`,
+// ['CON-b7e8a70b-7946-4458-be22-011fa5a7d7aa'], 
+// (err,result) => {
 //     if(err){
 //         console.log(err);
 //     }
@@ -30,7 +37,7 @@ module.exports = client;
 //         console.log(result.rowCount);
 //         console.log(result.rows);
 //     }
-//     client.end();
+//     // client.end();
 // });
 
 // client.on("on")

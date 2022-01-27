@@ -15,6 +15,8 @@ const vonage = new Vonage({
 app.use(morgan('tiny'));
 app.use(express.json());
 
+// Helper Functions
+
 function getStreamAction(url,needBargeIn=true){
   let streamAction = {
     "action": "stream",
@@ -26,7 +28,7 @@ function getStreamAction(url,needBargeIn=true){
 }
 
 function getInputAction(eventEndpoint,speechInput = false){
-  let remoteUrl = "https://32be-182-74-35-130.ngrok.io/"
+  let remoteUrl = "https://210a-182-74-35-130.ngrok.io/"
   if(speechInput){
     let inputAction = {
       "action":"input",
@@ -71,7 +73,6 @@ function create_entry_if_not_exists(){
                 else{
                     console.log("entry created");
                 }
-                client.end();
             });
           }
           else{
@@ -79,6 +80,20 @@ function create_entry_if_not_exists(){
           }
       }
   });
+}
+
+function initializeConversationEntry(uuid,beginTime){
+  client.query(`insert into conversation (uuid,to_mobile_number,begin_time) values ($1,$2,$3) RETURNING *`,
+    [uuid,to,beginTime], 
+    (err,result) => {
+        if(err){
+            console.log(err);
+        }
+        else{
+            console.log("conversation Initialized");
+            console.log(result.rows);
+        }
+    });
 }
 
 function updateData(){
@@ -101,15 +116,32 @@ function updateData(){
       col2 = "address_audio_url"
       break;
   }
-  client.query(`update user_info set ${col1} = $1, ${col2} = $2 where mobile_number = $3 RETURNING *`,[spokenData,recordingPath,to], (err,result) => {
-    if(err){
-      console.log(err);
-    }
-    else{
-      console.log(result.rows);
-    }
+  client.query(`update user_info set ${col1} = $1, ${col2} = $2 where mobile_number = $3 RETURNING *`,
+    [spokenData,recordingPath,to],
+    (err,result) => {
+      if(err){
+        console.log(err);
+      }
+      else{
+        console.log(result.rows);
+      }
   });
 }
+
+function updateConversationEntry(uuid,endTime){
+  client.query(`update conversation set end_time = $1, actions_by_user = $2 where uuid = $3 RETURNING *`,
+    [endTime,JSON.stringify(actionsByUser),uuid],
+    (err,result) => {
+      if(err){
+        console.log(err);
+      }
+      else{
+        console.log(result.rows);
+      }
+  });
+}
+
+// Global Variables
 
 let baseUrl = "https://github.com/manikanta-MB/IVR-Audio-Recordings/blob/main/"
 let baseInputAction = getInputAction("base_input")
@@ -123,6 +155,7 @@ let spokenData = ""
 let recordingPath = ""
 let recordingUrl = ""
 let to = ""
+let actionsByUser = []
 
 app.get('/call', (req, res) => {
   vonage.calls.create({
@@ -152,12 +185,17 @@ app.post('/event', (req, res) => {
   console.log(req.body);
   let status = req.body.status;
   if(status == 'answered'){
-    client.connect();
+    actionsByUser = [];
     to = req.body.to;
+    let uuid = req.body.conversation_uuid;
+    let beginTime = req.body.timestamp;
+    initializeConversationEntry(uuid,beginTime);
     create_entry_if_not_exists();
   }
   else if(status == 'completed'){
-    client.end();
+    let endTime = req.body.timestamp;
+    let uuid = req.body.conversation_uuid;
+    updateConversationEntry(uuid,endTime);
   }
   res.status(200).send('');
 });
@@ -168,6 +206,7 @@ app.post('/base_input',(req,res) => {
   let responseObject = req.body;
   let isTimedOut = responseObject.dtmf.timed_out
   if(isTimedOut){
+    actionsByUser.push({"timeOut":true});
     res.json([
       getStreamAction(baseUrl + "baseinput/input%203.mp3?raw=true"),
       getStreamAction(baseUrl + "baseinput/input%202.mp3?raw=true"),
@@ -176,6 +215,7 @@ app.post('/base_input',(req,res) => {
   }
   else{
     let entered_digit = responseObject.dtmf.digits;
+    actionsByUser.push({"pressed":entered_digit});
     switch (entered_digit){
       case "1":
         chosenLanguage = "telugu"
@@ -234,6 +274,7 @@ app.post('/info_input',(req,res) => {
   let responseObject = req.body;
   let isTimedOut = responseObject.dtmf.timed_out
   if(isTimedOut){
+    actionsByUser.push({"timeOut":true});
     res.json([
       getStreamAction(baseUrl + chosenLanguage + "/input%203.mp3?raw=true"),
       getStreamAction(baseUrl + chosenLanguage + "/info/input%202.mp3?raw=true"),
@@ -242,6 +283,7 @@ app.post('/info_input',(req,res) => {
   }
   else{
     let entered_digit = responseObject.dtmf.digits;
+    actionsByUser.push({"pressed":entered_digit});
     switch (entered_digit){
       case "1":
         chosenInfo = "yn"
@@ -304,6 +346,7 @@ app.post("/enter_info",(req,res) => {
   console.log(requestObj);
 
   if(requestObj.speech.timeout_reason == 'start_timeout'){
+    actionsByUser.push({"timeOut":true});
     res.json([
       getStreamAction(baseUrl + chosenLanguage + "/enter info/no%20input.mp3?raw=true",false),
       getStreamAction(baseUrl + chosenLanguage + "/enter info/" + chosenInfo + ".mp3?raw=true",false),
@@ -311,6 +354,7 @@ app.post("/enter_info",(req,res) => {
     ]);
   }
   else if(requestObj.speech.hasOwnProperty("error")){
+    actionsByUser.push({"unableToAnalyzeVoice":true});
     res.json([
       getStreamAction(baseUrl + chosenLanguage + "/enter info/error.mp3?raw=true",false),
       getStreamAction(baseUrl + chosenLanguage + "/enter info/" + chosenInfo + ".mp3?raw=true",false),
@@ -324,6 +368,11 @@ app.post("/enter_info",(req,res) => {
       recordingUrl = requestObj.speech.recording_url;
       console.log(recordingUrl);
       recordingPath = "Voice Data/"+to+"_"+chosenInfo+".mp3"
+
+      actionsByUser.push({"spokenData":spokenData});
+      actionsByUser.push({"recordingUrl":recordingUrl});
+      actionsByUser.push({"recordingPath":recordingPath});
+
       res.json([
         {
           "action":"stream",
@@ -353,6 +402,7 @@ app.post("/confirm_info",(req,res) => {
   let requestObject = req.body;
   let isTimedOut = requestObject.dtmf.timed_out
   if(isTimedOut){
+    actionsByUser.push({"timeOut":true});
     res.json([
       {
         "action":"stream",
@@ -377,6 +427,7 @@ app.post("/confirm_info",(req,res) => {
   }
   else{
     let entered_digit = requestObject.dtmf.digits;
+    actionsByUser.push({"pressed":entered_digit});
     switch(entered_digit){
       case "1":
         vonage.files.save(recordingUrl, recordingPath, (err, res) => {
@@ -440,6 +491,7 @@ app.post("/result_info",(req,res) => {
   let requestObject = req.body;
   let isTimedOut = requestObject.dtmf.timed_out
   if(isTimedOut){
+    actionsByUser.push({"timeOut":true});
     res.json([
       getStreamAction(baseUrl + chosenLanguage + "/input%203.mp3?raw=true"),
       getStreamAction(baseUrl + chosenLanguage + "/result info/callback.mp3?raw=true"),
@@ -448,6 +500,7 @@ app.post("/result_info",(req,res) => {
   }
   else{
     let entered_digit = requestObject.dtmf.digits;
+    actionsByUser.push({"pressed":entered_digit});
     switch(entered_digit){
       case "1":
         res.json([
