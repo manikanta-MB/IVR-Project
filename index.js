@@ -15,17 +15,18 @@ const vonage = new Vonage({
 app.use(morgan('tiny'));
 app.use(express.json());
 
-function getStreamAction(url){
+function getStreamAction(url,needBargeIn=true){
   let streamAction = {
     "action": "stream",
     "streamUrl": [url],
-    "bargeIn": true
+    "level": 1,
+    "bargeIn": needBargeIn
   }
   return streamAction
 }
 
 function getInputAction(eventEndpoint,speechInput = false){
-  let remoteUrl = "https://b05b-36-255-87-146.ngrok.io/"
+  let remoteUrl = "https://32be-182-74-35-130.ngrok.io/"
   if(speechInput){
     let inputAction = {
       "action":"input",
@@ -245,28 +246,28 @@ app.post('/info_input',(req,res) => {
       case "1":
         chosenInfo = "yn"
         res.json([
-          getStreamAction(baseUrl + chosenLanguage + "/enter info/yn.mp3?raw=true"),
+          getStreamAction(baseUrl + chosenLanguage + "/enter info/yn.mp3?raw=true",false),
           enterInfoInputAction
         ])
         break;
       case "2":
         chosenInfo = "fn"
         res.json([
-          getStreamAction(baseUrl + chosenLanguage + "/enter info/fn.mp3?raw=true"),
+          getStreamAction(baseUrl + chosenLanguage + "/enter info/fn.mp3?raw=true",false),
           enterInfoInputAction
         ])
         break;
       case "3":
         chosenInfo = "mn"
         res.json([
-          getStreamAction(baseUrl + chosenLanguage + "/enter info/mn.mp3?raw=true"),
+          getStreamAction(baseUrl + chosenLanguage + "/enter info/mn.mp3?raw=true",false),
           enterInfoInputAction
         ])
         break;
       case "4":
         chosenInfo = "ad"
         res.json([
-          getStreamAction(baseUrl + chosenLanguage + "/enter info/ad.mp3?raw=true"),
+          getStreamAction(baseUrl + chosenLanguage + "/enter info/ad.mp3?raw=true",false),
           enterInfoInputAction
         ])
         break;
@@ -299,34 +300,50 @@ app.post('/info_input',(req,res) => {
 // Level 3
 app.post("/enter_info",(req,res) => {
   let requestObj = req.body;
-  
+  console.log("Enter Info");
+  console.log(requestObj);
+
   if(requestObj.speech.timeout_reason == 'start_timeout'){
     res.json([
-      getStreamAction(baseUrl + chosenLanguage + "/enter info/no%20input.mp3?raw=true"),
-      getStreamAction(baseUrl + chosenLanguage + "/enter info/" + chosenInfo + ".mp3?raw=true"),
+      getStreamAction(baseUrl + chosenLanguage + "/enter info/no%20input.mp3?raw=true",false),
+      getStreamAction(baseUrl + chosenLanguage + "/enter info/" + chosenInfo + ".mp3?raw=true",false),
+      enterInfoInputAction
+    ]);
+  }
+  else if(requestObj.speech.hasOwnProperty("error")){
+    res.json([
+      getStreamAction(baseUrl + chosenLanguage + "/enter info/error.mp3?raw=true",false),
+      getStreamAction(baseUrl + chosenLanguage + "/enter info/" + chosenInfo + ".mp3?raw=true",false),
       enterInfoInputAction
     ]);
   }
   else{
-    spokenData = requestObj.speech.results[0].text
-    console.log(spokenData);
-    recordingUrl = requestObj.speech.recording_url;
-    console.log(recordingUrl);
-    recordingPath = "Voice Data/"+to+"_"+chosenInfo+".mp3"
-    res.json([
-      {
-        "action":"stream",
-        "streamUrl":[baseUrl + chosenLanguage + "/confirm info/" + chosenInfo + ".mp3?raw=true"]
-      },
-      {
-        "action":"talk",
-        "text":spokenData,
-        "language":"en-IN",
-        "style": 0
-      },
-      getStreamAction(baseUrl + chosenLanguage + "/confirm info/soc.mp3?raw=true"),
-      cofirmInfoInputAction
-    ]);
+    if(requestObj.speech.results && requestObj.speech.results.length > 0){
+      spokenData = requestObj.speech.results[0].text
+      console.log(spokenData);
+      recordingUrl = requestObj.speech.recording_url;
+      console.log(recordingUrl);
+      recordingPath = "Voice Data/"+to+"_"+chosenInfo+".mp3"
+      res.json([
+        {
+          "action":"stream",
+          "streamUrl":[baseUrl + chosenLanguage + "/confirm info/" + chosenInfo + ".mp3?raw=true"],
+          "level": 1
+        },
+        {
+          "action":"talk",
+          "text":spokenData,
+          "language":"en-IN",
+          "style": 0,
+          "level":1
+        },
+        getStreamAction(baseUrl + chosenLanguage + "/confirm info/soc.mp3?raw=true"),
+        cofirmInfoInputAction
+      ]);
+    }
+    else{
+      res.json([]);
+    }
   }
 });
 
@@ -339,17 +356,20 @@ app.post("/confirm_info",(req,res) => {
     res.json([
       {
         "action":"stream",
-        "streamUrl":[baseUrl + chosenLanguage + "/input%203.mp3?raw=true"]
+        "streamUrl":[baseUrl + chosenLanguage + "/input%203.mp3?raw=true"],
+        "level": 1
       },
       {
         "action":"stream",
-        "streamUrl":[baseUrl + chosenLanguage + "/confirm info/" + chosenInfo + ".mp3?raw=true"]
+        "streamUrl":[baseUrl + chosenLanguage + "/confirm info/" + chosenInfo + ".mp3?raw=true"],
+        "level": 1
       },
       {
         "action":"talk",
         "text":spokenData,
         "language":"en-IN",
-        "style": 0
+        "style": 0,
+        "level": 1
       },
       getStreamAction(baseUrl + chosenLanguage + "/confirm info/soc.mp3?raw=true"),
       cofirmInfoInputAction
@@ -369,7 +389,8 @@ app.post("/confirm_info",(req,res) => {
         res.json([
           {
             "action":"stream",
-            "streamUrl":[baseUrl + chosenLanguage + "/result info/" + chosenInfo + " saved.mp3?raw=true"]
+            "streamUrl":[baseUrl + chosenLanguage + "/result info/" + chosenInfo + " saved.mp3?raw=true"],
+            "level": 1
           },
           getStreamAction(baseUrl + chosenLanguage + "/result info/callback.mp3?raw=true"),
           resultInfoInputAction
@@ -379,7 +400,8 @@ app.post("/confirm_info",(req,res) => {
         res.json([
           {
             "action":"stream",
-            "streamUrl":[baseUrl + chosenLanguage + "/result info/" + chosenInfo + " cancelled.mp3?raw=true"]
+            "streamUrl":[baseUrl + chosenLanguage + "/result info/" + chosenInfo + " cancelled.mp3?raw=true"],
+            "level": 1
           },
           getStreamAction(baseUrl + chosenLanguage + "/result info/callback.mp3?raw=true"),
           resultInfoInputAction
@@ -389,17 +411,20 @@ app.post("/confirm_info",(req,res) => {
         res.json([
           {
             "action":"stream",
-            "streamUrl":[baseUrl + chosenLanguage + "/input%204.mp3?raw=true"]
+            "streamUrl":[baseUrl + chosenLanguage + "/input%204.mp3?raw=true"],
+            "level": 1
           },
           {
             "action":"stream",
-            "streamUrl":[baseUrl + chosenLanguage + "/confirm info/" + chosenInfo + ".mp3?raw=true"]
+            "streamUrl":[baseUrl + chosenLanguage + "/confirm info/" + chosenInfo + ".mp3?raw=true"],
+            "level": 1
           },
           {
             "action":"talk",
             "text":spokenData,
             "language":"en-IN",
-            "style": 0
+            "style": 0,
+            "level": 1
           },
           getStreamAction(baseUrl + chosenLanguage + "/confirm info/soc.mp3?raw=true"),
           cofirmInfoInputAction
