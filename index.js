@@ -28,7 +28,7 @@ function getStreamAction(url,needBargeIn=true){
 }
 
 function getInputAction(eventEndpoint,speechInput = false){
-  let remoteUrl = "https://210a-182-74-35-130.ngrok.io/"
+  let remoteUrl = "https://dd6b-2401-4900-33b8-ef72-a171-61c-323a-8ad3.ngrok.io/"
   if(speechInput){
     let inputAction = {
       "action":"input",
